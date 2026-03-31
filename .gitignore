@@ -1,0 +1,11 @@
+config.env
+state/
+data/
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+__MACOSX/
