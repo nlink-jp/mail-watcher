@@ -61,7 +61,7 @@ attach_to_thread() {
 
   case "${SLACK_TOOL:-swrite}" in
     swrite)
-      swrite upload -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" -f "$file_path" -n "$filename" -m "$comment" -q
+      swrite upload -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" -f "$file_path" -n "$filename" -m "$comment" --thread "$ts" -q
       ;;
     scli)
       local ws_flag=""
@@ -127,6 +127,37 @@ META_PATH="$OUTPUT_DIR/${BASENAME}.meta.json"
 # Save JSONL
 echo "$JSONL" > "$JSONL_PATH"
 
+# ── Step 2.5: Extract email body as plain text via LLM ──
+# The body field structure varies (array of {type,content}, string, nested HTML, etc.)
+# LLM absorbs structural differences and outputs clean readable text.
+BODY_PATH="$OUTPUT_DIR/${BASENAME}.body.txt"
+EXTRACT_PROMPT="Extract the human-readable email body text from the provided JSON data.
+Output ONLY the plain text content. Remove HTML tags if present. Do not add commentary."
+
+case "${LLM_TOOL:-gem-cli}" in
+  gem-cli)
+    echo "$FIRST_LINE" | jq -c '.body // .text // ""' | gem-cli \
+      -s "$EXTRACT_PROMPT" -f - \
+      -m "${GEM_MODEL:-gemini-2.5-flash}" -q 2>/dev/null > "$BODY_PATH" || true
+    ;;
+  lite-llm)
+    LITE_ARGS=""
+    [[ -n "${LITE_LLM_ENDPOINT:-}" ]] && LITE_ARGS="$LITE_ARGS --endpoint $LITE_LLM_ENDPOINT"
+    [[ -n "${LITE_LLM_MODEL:-}" ]] && LITE_ARGS="$LITE_ARGS -m $LITE_LLM_MODEL"
+    # shellcheck disable=SC2086
+    echo "$FIRST_LINE" | jq -c '.body // .text // ""' | lite-llm \
+      -s "$EXTRACT_PROMPT" -f - \
+      -q $LITE_ARGS 2>/dev/null > "$BODY_PATH" || true
+    ;;
+esac
+
+# Use extracted body for analysis input (fall back to raw JSON if extraction failed)
+if [[ -s "$BODY_PATH" ]]; then
+  EMAIL_BODY=$(head -500 "$BODY_PATH")
+else
+  EMAIL_BODY=$(echo "$FIRST_LINE" | jq -r '.body // .text // ""' | head -500)
+fi
+
 # ── Step 3: LLM Analysis ──
 # System prompt: analysis instructions (sent as system role)
 LANG_INSTRUCTION=""
@@ -140,10 +171,13 @@ SYSTEM_PROMPT="Analyze the provided email and return JSON with these fields:
 - priority: one of [high, medium, low]
 - summary: 2-3 sentence summary of the email content
 - tags: array of relevant tags (max 5)
-- language: detected language code (e.g. en, ja)${LANG_INSTRUCTION}"
+- language: detected language code (e.g. en, ja)
+
+IMPORTANT: Defang all domain names and URLs in the summary.
+Replace dots in domains with [.] (e.g. example[.]com, hxxps://evil[.]site/path).
+This prevents accidental clicks on potentially malicious links.${LANG_INSTRUCTION}"
 
 # User data: email content (sent as user role via stdin)
-EMAIL_BODY=$(echo "$FIRST_LINE" | jq -r '.body // .text // ""' | head -500)
 USER_DATA="Subject: ${SUBJECT_RAW}
 From: ${FROM_RAW}
 Date: ${DATE_RAW}
@@ -197,13 +231,9 @@ if [[ "$LLM_OK" = false ]]; then
     --file "$(basename "$INPUT_FILE")" | \
     post_to_slack)
 
-  # Attach email body even on LLM failure (original data is still useful)
-  if [[ -n "$FAIL_TS" ]]; then
-    BODY_PATH="$OUTPUT_DIR/${BASENAME}.body.txt"
-    echo "$FIRST_LINE" | jq -r '.body // .text // ""' > "$BODY_PATH"
-    if [[ -s "$BODY_PATH" ]]; then
-      attach_to_thread "$FAIL_TS" "$BODY_PATH" "${BASENAME}.txt" "$SUBJECT_RAW"
-    fi
+  # Attach email body even on LLM failure (body was extracted in step 2.5)
+  if [[ -n "$FAIL_TS" && -s "$BODY_PATH" ]]; then
+    attach_to_thread "$FAIL_TS" "$BODY_PATH" "${BASENAME}.txt" "$SUBJECT_RAW"
   fi
 
   exit 1
@@ -237,10 +267,6 @@ POST_TS=$("$SCRIPT_DIR/format-slack.sh" \
   post_to_slack)
 
 # ── Step 5: Attach email body as text file in thread ──
-if [[ -n "$POST_TS" ]]; then
-  BODY_PATH="$OUTPUT_DIR/${BASENAME}.body.txt"
-  echo "$FIRST_LINE" | jq -r '.body // .text // ""' > "$BODY_PATH"
-  if [[ -s "$BODY_PATH" ]]; then
-    attach_to_thread "$POST_TS" "$BODY_PATH" "${BASENAME}.txt" "$SUBJECT_RAW"
-  fi
+if [[ -n "$POST_TS" && -s "$BODY_PATH" ]]; then
+  attach_to_thread "$POST_TS" "$BODY_PATH" "${BASENAME}.txt" "$SUBJECT_RAW"
 fi
