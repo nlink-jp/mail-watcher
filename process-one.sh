@@ -25,7 +25,7 @@ post_to_slack() {
   payload=$(cat)
   case "${SLACK_TOOL:-swrite}" in
     swrite)
-      echo "$payload" | swrite -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl
+      echo "$payload" | swrite post -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl
       ;;
     scli)
       local ws_flag=""
@@ -99,29 +99,42 @@ META_PATH="$OUTPUT_DIR/${BASENAME}.meta.json"
 echo "$JSONL" > "$JSONL_PATH"
 
 # ── Step 3: LLM Analysis ──
-ANALYSIS_PROMPT="Analyze the following email and return JSON with these fields:
+# System prompt: analysis instructions (sent as system role)
+SYSTEM_PROMPT="Analyze the provided email and return JSON with these fields:
 - category: one of [security-alert, incident, vulnerability, compliance, threat-intel, newsletter, announcement, discussion, other]
 - priority: one of [high, medium, low]
 - summary: 2-3 sentence summary of the email content
 - tags: array of relevant tags (max 5)
-- language: detected language code (e.g. en, ja)
+- language: detected language code (e.g. en, ja)"
 
-Email subject: ${SUBJECT_RAW}
-Email from: ${FROM_RAW}
-Email body:
-$(echo "$FIRST_LINE" | jq -r '.body // .text // ""' | head -500)"
+# User data: email content (sent as user role via stdin)
+EMAIL_BODY=$(echo "$FIRST_LINE" | jq -r '.body // .text // ""' | head -500)
+USER_DATA="Subject: ${SUBJECT_RAW}
+From: ${FROM_RAW}
+Date: ${DATE_RAW}
+
+${EMAIL_BODY}"
 
 LLM_OK=true
 case "${LLM_TOOL:-gem-cli}" in
   gem-cli)
-    ANALYSIS=$(echo "$ANALYSIS_PROMPT" | gem-cli -m "${GEM_MODEL:-gemini-2.5-flash}" --json 2>/dev/null) || LLM_OK=false
+    ANALYSIS=$(echo "$USER_DATA" | gem-cli \
+      -s "$SYSTEM_PROMPT" \
+      -f - \
+      -m "${GEM_MODEL:-gemini-2.5-flash}" \
+      --format json \
+      -q 2>/dev/null) || LLM_OK=false
     ;;
   lite-llm)
     LITE_ARGS=""
-    [[ -n "${LITE_LLM_ENDPOINT:-}" ]] && LITE_ARGS="$LITE_ARGS -e $LITE_LLM_ENDPOINT"
+    [[ -n "${LITE_LLM_ENDPOINT:-}" ]] && LITE_ARGS="$LITE_ARGS --endpoint $LITE_LLM_ENDPOINT"
     [[ -n "${LITE_LLM_MODEL:-}" ]] && LITE_ARGS="$LITE_ARGS -m $LITE_LLM_MODEL"
     # shellcheck disable=SC2086
-    ANALYSIS=$(echo "$ANALYSIS_PROMPT" | lite-llm $LITE_ARGS --json 2>/dev/null) || LLM_OK=false
+    ANALYSIS=$(echo "$USER_DATA" | lite-llm \
+      -s "$SYSTEM_PROMPT" \
+      -f - \
+      --format json \
+      -q $LITE_ARGS 2>/dev/null) || LLM_OK=false
     ;;
   *)
     echo "Unknown LLM_TOOL: $LLM_TOOL" >&2
