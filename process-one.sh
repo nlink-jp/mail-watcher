@@ -19,7 +19,8 @@ source "$CONFIG"
 
 # ── Slack posting helper ──
 post_to_slack() {
-  # Reads Block Kit JSON from stdin, posts via configured tool
+  # Reads Block Kit JSON from stdin, posts via configured tool.
+  # Block Kit payload is extracted to just the blocks array for scli.
   local payload
   payload=$(cat)
   case "${SLACK_TOOL:-swrite}" in
@@ -27,7 +28,13 @@ post_to_slack() {
       echo "$payload" | swrite -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl
       ;;
     scli)
-      echo "$payload" | scli message post -c "$SLACK_CHANNEL" --payload
+      local ws_flag=""
+      [[ -n "${SLACK_WORKSPACE:-}" ]] && ws_flag="-w $SLACK_WORKSPACE"
+      # scli --blocks-file expects the blocks array, not the full payload
+      local blocks
+      blocks=$(echo "$payload" | jq -c '.blocks')
+      # shellcheck disable=SC2086
+      echo "$blocks" | scli post "$SLACK_CHANNEL" $ws_flag --blocks-file -
       ;;
     *)
       echo "Unknown SLACK_TOOL: $SLACK_TOOL" >&2
