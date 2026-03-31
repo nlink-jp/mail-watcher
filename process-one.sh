@@ -21,22 +21,30 @@ source "$CONFIG"
 
 # post_to_slack: reads Block Kit JSON from stdin, posts via configured tool.
 # Outputs the message ts to stdout for thread attachment use.
+# Uses temp files to avoid stdin pipe conflicts in subshells.
 post_to_slack() {
   local payload
   payload=$(cat)
+  local tmpfile
+  tmpfile=$(mktemp "${TMPDIR:-/tmp}/mail-watcher-blocks.XXXXXX")
+  # shellcheck disable=SC2064
+  trap "rm -f '$tmpfile'" RETURN
+
   case "${SLACK_TOOL:-swrite}" in
     swrite)
       # swrite post outputs ts to stdout
-      echo "$payload" | swrite post -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl -q
+      echo "$payload" > "$tmpfile"
+      swrite post -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl -q --from-file "$tmpfile"
       ;;
     scli)
       local ws_flag=""
       [[ -n "${SLACK_WORKSPACE:-}" ]] && ws_flag="-w $SLACK_WORKSPACE"
-      local blocks
-      blocks=$(echo "$payload" | jq -c '.blocks')
-      # scli --json outputs {"ts":"...","channel":"..."}, extract ts
+      # Extract blocks array and write to temp file
+      echo "$payload" | jq -c '.blocks' > "$tmpfile"
       # shellcheck disable=SC2086
-      echo "$blocks" | scli post "$SLACK_CHANNEL" $ws_flag --blocks-file - --json | jq -r '.ts'
+      local result
+      result=$(scli post "$SLACK_CHANNEL" $ws_flag --blocks-file "$tmpfile" --json)
+      echo "$result" | jq -r '.ts'
       ;;
     *)
       echo "Unknown SLACK_TOOL: $SLACK_TOOL" >&2
