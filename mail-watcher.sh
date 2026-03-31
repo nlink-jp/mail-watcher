@@ -91,7 +91,7 @@ while true; do
       log "  FAILED: $(basename "$file") — $reason"
     fi
 
-  done < <(find "$WATCH_DIR" -maxdepth 2 \( -iname '*.eml' -o -iname '*.msg' \) -print0 2>/dev/null | sort -z)
+  done < <(find "$WATCH_DIR" -maxdepth 2 \( -iname '*.eml' -o -iname '*.msg' \) -print0 2>/dev/null | xargs -0 stat -f '%m%t%N' 2>/dev/null | sort -n | cut -f2- | tr '\n' '\0')
 
   sleep "$POLL_INTERVAL"
 done

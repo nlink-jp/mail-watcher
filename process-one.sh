@@ -100,12 +100,18 @@ echo "$JSONL" > "$JSONL_PATH"
 
 # ── Step 3: LLM Analysis ──
 # System prompt: analysis instructions (sent as system role)
+LANG_INSTRUCTION=""
+if [[ -n "${SUMMARY_LANG:-}" ]]; then
+  LANG_INSTRUCTION="
+Write the summary in ${SUMMARY_LANG}. Tags should remain in English."
+fi
+
 SYSTEM_PROMPT="Analyze the provided email and return JSON with these fields:
 - category: one of [security-alert, incident, vulnerability, compliance, threat-intel, newsletter, announcement, discussion, other]
 - priority: one of [high, medium, low]
 - summary: 2-3 sentence summary of the email content
 - tags: array of relevant tags (max 5)
-- language: detected language code (e.g. en, ja)"
+- language: detected language code (e.g. en, ja)${LANG_INSTRUCTION}"
 
 # User data: email content (sent as user role via stdin)
 EMAIL_BODY=$(echo "$FIRST_LINE" | jq -r '.body // .text // ""' | head -500)
