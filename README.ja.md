@@ -15,7 +15,7 @@ OneDrive/Google Drive 同期
   → swrite で Block Kit 通知を Slack に投稿
 ```
 
-べき等: SHA-256 ハッシュで処理済みファイルを追跡。停止・再起動しても未処理分を自動で処理。
+べき等: SHA-256 ハッシュで処理済みファイルを追跡。停止・再起動しても未処理分を自動で処理。ファイルは古い順に処理される。
 
 ## クイックスタート
 
@@ -49,9 +49,11 @@ cp config.env.template config.env
 | `POLL_INTERVAL` | スキャン間隔（秒） | `60` |
 | `LLM_TOOL` | `gem-cli` または `lite-llm` | `gem-cli` |
 | `GEM_MODEL` | Gemini モデル名 | `gemini-2.5-flash` |
+| `SUMMARY_LANG` | 要約の言語（例: `ja`, `en`; 空欄 = 自動検出） | (空欄) |
 | `SLACK_TOOL` | `swrite`（bot）または `scli`（ユーザートークン） | `swrite` |
 | `SLACK_CHANNEL` | 通知先 Slack チャンネル | `#mail-digest` |
 | `SLACK_PROFILE` | swrite プロファイル名（swrite のみ） | `default` |
+| `SLACK_WORKSPACE` | scli ワークスペース名（scli のみ） | (空欄) |
 
 ## 出力
 

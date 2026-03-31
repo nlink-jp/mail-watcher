@@ -15,7 +15,7 @@ OneDrive/Google Drive sync
   → swrite posts Block Kit notification to Slack
 ```
 
-Idempotent: tracks processed files by SHA-256 hash. Safe to stop and restart — backlog is processed automatically.
+Idempotent: tracks processed files by SHA-256 hash. Safe to stop and restart — backlog is processed automatically. Files are processed in oldest-first order.
 
 ## Quick Start
 
@@ -49,9 +49,11 @@ The following CLI tools must be in `$PATH`:
 | `POLL_INTERVAL` | Seconds between scans | `60` |
 | `LLM_TOOL` | `gem-cli` or `lite-llm` | `gem-cli` |
 | `GEM_MODEL` | Gemini model name | `gemini-2.5-flash` |
+| `SUMMARY_LANG` | Summary language (e.g. `ja`, `en`; empty = auto-detect) | (empty) |
 | `SLACK_TOOL` | `swrite` (bot) or `scli` (user token) | `swrite` |
 | `SLACK_CHANNEL` | Slack channel for notifications | `#mail-digest` |
 | `SLACK_PROFILE` | swrite profile name (swrite only) | `default` |
+| `SLACK_WORKSPACE` | scli workspace name (scli only) | (empty) |
 
 ## Output
 
