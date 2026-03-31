@@ -54,20 +54,20 @@ post_to_slack() {
 }
 
 # attach_to_thread: upload a text file as a thread reply to the given ts.
-# Usage: attach_to_thread <ts> <file_path> <filename>
+# Usage: attach_to_thread <ts> <file_path> <filename> <comment>
 attach_to_thread() {
-  local ts="$1" file_path="$2" filename="$3"
+  local ts="$1" file_path="$2" filename="$3" comment="${4:-}"
   [[ -z "$ts" ]] && return 0
 
   case "${SLACK_TOOL:-swrite}" in
     swrite)
-      swrite upload -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" -f "$file_path" -n "$filename" -q
+      swrite upload -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" -f "$file_path" -n "$filename" -m "$comment" -q
       ;;
     scli)
       local ws_flag=""
       [[ -n "${SLACK_WORKSPACE:-}" ]] && ws_flag="-w $SLACK_WORKSPACE"
       # shellcheck disable=SC2086
-      scli post "$SLACK_CHANNEL" $ws_flag --file "$file_path" --thread "$ts"
+      scli post "$SLACK_CHANNEL" "$filename" $ws_flag --file "$file_path" --thread "$ts"
       ;;
   esac
 }
@@ -202,7 +202,7 @@ if [[ "$LLM_OK" = false ]]; then
     BODY_PATH="$OUTPUT_DIR/${BASENAME}.body.txt"
     echo "$FIRST_LINE" | jq -r '.body // .text // ""' > "$BODY_PATH"
     if [[ -s "$BODY_PATH" ]]; then
-      attach_to_thread "$FAIL_TS" "$BODY_PATH" "${BASENAME}.txt"
+      attach_to_thread "$FAIL_TS" "$BODY_PATH" "${BASENAME}.txt" "$SUBJECT_RAW"
     fi
   fi
 
@@ -241,6 +241,6 @@ if [[ -n "$POST_TS" ]]; then
   BODY_PATH="$OUTPUT_DIR/${BASENAME}.body.txt"
   echo "$FIRST_LINE" | jq -r '.body // .text // ""' > "$BODY_PATH"
   if [[ -s "$BODY_PATH" ]]; then
-    attach_to_thread "$POST_TS" "$BODY_PATH" "${BASENAME}.txt"
+    attach_to_thread "$POST_TS" "$BODY_PATH" "${BASENAME}.txt" "$SUBJECT_RAW"
   fi
 fi
