@@ -37,7 +37,7 @@ The following CLI tools must be in `$PATH`:
 | [eml-to-jsonl](https://github.com/nlink-jp/eml-to-jsonl) | Convert .eml files to JSONL |
 | [msg-to-jsonl](https://github.com/nlink-jp/msg-to-jsonl) | Convert .msg files to JSONL |
 | [gem-cli](https://github.com/nlink-jp/gem-cli) or [lite-llm](https://github.com/nlink-jp/lite-llm) | LLM analysis |
-| [swrite](https://github.com/nlink-jp/swrite) | Slack notification |
+| [swrite](https://github.com/nlink-jp/swrite) or [scli](https://github.com/nlink-jp/scli) | Slack notification |
 | `jq` | JSON processing |
 
 ## Configuration
@@ -49,8 +49,9 @@ The following CLI tools must be in `$PATH`:
 | `POLL_INTERVAL` | Seconds between scans | `60` |
 | `LLM_TOOL` | `gem-cli` or `lite-llm` | `gem-cli` |
 | `GEM_MODEL` | Gemini model name | `gemini-2.5-flash` |
+| `SLACK_TOOL` | `swrite` (bot) or `scli` (user token) | `swrite` |
 | `SLACK_CHANNEL` | Slack channel for notifications | `#mail-digest` |
-| `SLACK_PROFILE` | swrite profile name | `default` |
+| `SLACK_PROFILE` | swrite profile name (swrite only) | `default` |
 
 ## Output
 

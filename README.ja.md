@@ -37,7 +37,7 @@ cp config.env.template config.env
 | [eml-to-jsonl](https://github.com/nlink-jp/eml-to-jsonl) | .eml → JSONL 変換 |
 | [msg-to-jsonl](https://github.com/nlink-jp/msg-to-jsonl) | .msg → JSONL 変換 |
 | [gem-cli](https://github.com/nlink-jp/gem-cli) or [lite-llm](https://github.com/nlink-jp/lite-llm) | LLM 分析 |
-| [swrite](https://github.com/nlink-jp/swrite) | Slack 通知 |
+| [swrite](https://github.com/nlink-jp/swrite) or [scli](https://github.com/nlink-jp/scli) | Slack 通知 |
 | `jq` | JSON 処理 |
 
 ## 設定
@@ -49,8 +49,9 @@ cp config.env.template config.env
 | `POLL_INTERVAL` | スキャン間隔（秒） | `60` |
 | `LLM_TOOL` | `gem-cli` または `lite-llm` | `gem-cli` |
 | `GEM_MODEL` | Gemini モデル名 | `gemini-2.5-flash` |
+| `SLACK_TOOL` | `swrite`（bot）または `scli`（ユーザートークン） | `swrite` |
 | `SLACK_CHANNEL` | 通知先 Slack チャンネル | `#mail-digest` |
-| `SLACK_PROFILE` | swrite プロファイル名 | `default` |
+| `SLACK_PROFILE` | swrite プロファイル名（swrite のみ） | `default` |
 
 ## 出力
 

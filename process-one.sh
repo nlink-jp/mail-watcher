@@ -7,7 +7,7 @@
 #   1. Convert to JSONL (eml-to-jsonl / msg-to-jsonl)
 #   2. Extract metadata → generate standardized filename
 #   3. Analyze with LLM (gem-cli / lite-llm)
-#   4. Notify via Slack (swrite)
+#   4. Notify via Slack (swrite or scli)
 
 set -euo pipefail
 
@@ -16,6 +16,25 @@ CONFIG="${MAIL_WATCHER_CONFIG:-$SCRIPT_DIR/config.env}"
 
 # shellcheck source=/dev/null
 source "$CONFIG"
+
+# ── Slack posting helper ──
+post_to_slack() {
+  # Reads Block Kit JSON from stdin, posts via configured tool
+  local payload
+  payload=$(cat)
+  case "${SLACK_TOOL:-swrite}" in
+    swrite)
+      echo "$payload" | swrite -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl
+      ;;
+    scli)
+      echo "$payload" | scli message post -c "$SLACK_CHANNEL" --payload
+      ;;
+    *)
+      echo "Unknown SLACK_TOOL: $SLACK_TOOL" >&2
+      return 1
+      ;;
+  esac
+}
 
 INPUT_FILE="$1"
 HASH="$2"
@@ -121,7 +140,7 @@ if [[ "$LLM_OK" = false ]]; then
     --from "$FROM_RAW" \
     --date "$DATE_RAW" \
     --file "$(basename "$INPUT_FILE")" | \
-    swrite -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl
+    post_to_slack
 
   exit 1
 fi
@@ -151,4 +170,4 @@ TAGS=$(echo "$ANALYSIS" | jq -r '(.tags // []) | join(", ")')
   --subject "$SUBJECT_RAW" \
   --from "$FROM_RAW" \
   --date "$DATE_RAW" | \
-  swrite -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl
+  post_to_slack
