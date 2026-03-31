@@ -12,7 +12,8 @@ OneDrive/Google Drive 同期
   → mail-watcher がポーリングで検知
   → eml-to-jsonl / msg-to-jsonl で構造化 JSONL に変換
   → gem-cli / lite-llm で分類・要約
-  → swrite で Block Kit 通知を Slack に投稿
+  → swrite/scli で Block Kit 通知を Slack に投稿
+  → メール本文をテキストファイルとしてスレッドに添付
 ```
 
 べき等: SHA-256 ハッシュで処理済みファイルを追跡。停止・再起動しても未処理分を自動で処理。ファイルは古い順に処理される。
@@ -57,12 +58,13 @@ cp config.env.template config.env
 
 ## 出力
 
-処理されたメールごとに2ファイルを保存:
+処理されたメールごとに3ファイルを保存:
 
 ```
 data/
   2026-03-31_14-30-00_alert-unusual-login-detected.jsonl      # 構造化メールデータ
   2026-03-31_14-30-00_alert-unusual-login-detected.meta.json   # 分析メタデータ
+  2026-03-31_14-30-00_alert-unusual-login-detected.body.txt    # メール本文（テキスト）
 ```
 
 ## エラーハンドリング

@@ -12,7 +12,8 @@ OneDrive/Google Drive sync
   → mail-watcher detects new files (polling)
   → eml-to-jsonl / msg-to-jsonl converts to structured JSONL
   → gem-cli / lite-llm classifies and summarizes
-  → swrite posts Block Kit notification to Slack
+  → swrite/scli posts Block Kit notification to Slack
+  → email body attached as text file in thread
 ```
 
 Idempotent: tracks processed files by SHA-256 hash. Safe to stop and restart — backlog is processed automatically. Files are processed in oldest-first order.
@@ -57,12 +58,13 @@ The following CLI tools must be in `$PATH`:
 
 ## Output
 
-For each processed email, two files are saved:
+For each processed email, three files are saved:
 
 ```
 data/
   2026-03-31_14-30-00_alert-unusual-login-detected.jsonl      # Structured mail data
   2026-03-31_14-30-00_alert-unusual-login-detected.meta.json   # Analysis metadata
+  2026-03-31_14-30-00_alert-unusual-login-detected.body.txt    # Email body (plain text)
 ```
 
 The `.meta.json` contains:

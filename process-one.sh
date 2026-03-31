@@ -17,28 +17,49 @@ CONFIG="${MAIL_WATCHER_CONFIG:-$SCRIPT_DIR/config.env}"
 # shellcheck source=/dev/null
 source "$CONFIG"
 
-# ── Slack posting helper ──
+# ── Slack posting helpers ──
+
+# post_to_slack: reads Block Kit JSON from stdin, posts via configured tool.
+# Outputs the message ts to stdout for thread attachment use.
 post_to_slack() {
-  # Reads Block Kit JSON from stdin, posts via configured tool.
-  # Block Kit payload is extracted to just the blocks array for scli.
   local payload
   payload=$(cat)
   case "${SLACK_TOOL:-swrite}" in
     swrite)
-      echo "$payload" | swrite post -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl
+      # swrite post outputs ts to stdout
+      echo "$payload" | swrite post -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" --format payload --no-unfurl -q
       ;;
     scli)
       local ws_flag=""
       [[ -n "${SLACK_WORKSPACE:-}" ]] && ws_flag="-w $SLACK_WORKSPACE"
-      # scli --blocks-file expects the blocks array, not the full payload
       local blocks
       blocks=$(echo "$payload" | jq -c '.blocks')
+      # scli --json outputs {"ts":"...","channel":"..."}, extract ts
       # shellcheck disable=SC2086
-      echo "$blocks" | scli post "$SLACK_CHANNEL" $ws_flag --blocks-file -
+      echo "$blocks" | scli post "$SLACK_CHANNEL" $ws_flag --blocks-file - --json | jq -r '.ts'
       ;;
     *)
       echo "Unknown SLACK_TOOL: $SLACK_TOOL" >&2
       return 1
+      ;;
+  esac
+}
+
+# attach_to_thread: upload a text file as a thread reply to the given ts.
+# Usage: attach_to_thread <ts> <file_path> <filename>
+attach_to_thread() {
+  local ts="$1" file_path="$2" filename="$3"
+  [[ -z "$ts" ]] && return 0
+
+  case "${SLACK_TOOL:-swrite}" in
+    swrite)
+      swrite upload -c "$SLACK_CHANNEL" -p "$SLACK_PROFILE" -f "$file_path" -n "$filename" -q
+      ;;
+    scli)
+      local ws_flag=""
+      [[ -n "${SLACK_WORKSPACE:-}" ]] && ws_flag="-w $SLACK_WORKSPACE"
+      # shellcheck disable=SC2086
+      scli post "$SLACK_CHANNEL" $ws_flag --file "$file_path" --thread "$ts"
       ;;
   esac
 }
@@ -161,12 +182,21 @@ if [[ "$LLM_OK" = false ]]; then
     > "$META_PATH"
 
   # Notify Slack about failure
-  "$SCRIPT_DIR/format-slack.sh" --failed \
+  FAIL_TS=$("$SCRIPT_DIR/format-slack.sh" --failed \
     --subject "$SUBJECT_RAW" \
     --from "$FROM_RAW" \
     --date "$DATE_RAW" \
     --file "$(basename "$INPUT_FILE")" | \
-    post_to_slack
+    post_to_slack)
+
+  # Attach email body even on LLM failure (original data is still useful)
+  if [[ -n "$FAIL_TS" ]]; then
+    BODY_PATH="$OUTPUT_DIR/${BASENAME}.body.txt"
+    echo "$FIRST_LINE" | jq -r '.body // .text // ""' > "$BODY_PATH"
+    if [[ -s "$BODY_PATH" ]]; then
+      attach_to_thread "$FAIL_TS" "$BODY_PATH" "${BASENAME}.txt"
+    fi
+  fi
 
   exit 1
 fi
@@ -188,7 +218,7 @@ PRIORITY=$(echo "$ANALYSIS" | jq -r '.priority // "low"')
 SUMMARY=$(echo "$ANALYSIS" | jq -r '.summary // "No summary available"')
 TAGS=$(echo "$ANALYSIS" | jq -r '(.tags // []) | join(", ")')
 
-"$SCRIPT_DIR/format-slack.sh" \
+POST_TS=$("$SCRIPT_DIR/format-slack.sh" \
   --category "$CATEGORY" \
   --priority "$PRIORITY" \
   --summary "$SUMMARY" \
@@ -196,4 +226,13 @@ TAGS=$(echo "$ANALYSIS" | jq -r '(.tags // []) | join(", ")')
   --subject "$SUBJECT_RAW" \
   --from "$FROM_RAW" \
   --date "$DATE_RAW" | \
-  post_to_slack
+  post_to_slack)
+
+# ── Step 5: Attach email body as text file in thread ──
+if [[ -n "$POST_TS" ]]; then
+  BODY_PATH="$OUTPUT_DIR/${BASENAME}.body.txt"
+  echo "$FIRST_LINE" | jq -r '.body // .text // ""' > "$BODY_PATH"
+  if [[ -s "$BODY_PATH" ]]; then
+    attach_to_thread "$POST_TS" "$BODY_PATH" "${BASENAME}.txt"
+  fi
+fi
