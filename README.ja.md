@@ -1,5 +1,8 @@
 # mail-watcher
 
+> **アーカイブ済み (2026-07-31)** — 利用・保守を終了しました。参照用に
+> 公開を維持しています。
+
 軽量メール監視ワークフロー — OneDrive/Google Drive で同期されるディレクトリの eml/msg ファイルを検知し、構造化データに変換、LLM で分析、Slack に通知します。
 
 [English README is here](README.md)

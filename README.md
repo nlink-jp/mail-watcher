@@ -1,5 +1,8 @@
 # mail-watcher
 
+> **Archived (2026-07-31)** — no longer used or maintained. Kept public
+> for reference.
+
 Lightweight mail monitoring workflow — watches a directory for incoming eml/msg files (synced via OneDrive/Google Drive), converts them to structured data, analyzes with LLM, and posts Slack notifications.
 
 [日本語版 README はこちら](README.ja.md)
